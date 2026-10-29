@@ -9,8 +9,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Giao diện HTML/React hoàn chỉnh được nhúng trực tiếp vào Streamlit
-html_code = """
+# Giao diện HTML/React hoàn chỉnh
+html_code = r"""
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -27,7 +27,6 @@ html_code = """
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #070b14; color: #f8fafc; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
-        /* Tùy chỉnh thanh cuộn */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #070b14; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
@@ -115,7 +114,6 @@ html_code = """
             const [marketMood, setMarketMood] = useState('BULL');
             const [timeframe, setTimeframe] = useState('1D');
             const [selectedTickerSymbol, setSelectedTickerSymbol] = useState(null);
-            const [lastUpdated, setLastUpdated] = useState(new Date());
 
             const [showAddModal, setShowAddModal] = useState(false);
             const [newTickerForm, setNewTickerForm] = useState({ symbol: '', name: '', type: 'STOCK', ref: '', price: '' });
@@ -169,7 +167,6 @@ html_code = """
                             flash: nextPrice !== t.price ? (nextPrice > t.price ? 'up' : 'down') : null
                         };
                     }));
-                    setLastUpdated(new Date());
                 }, 2600);
                 return () => clearInterval(interval);
             }, [isLiveSim, marketMood]);
@@ -195,45 +192,3 @@ html_code = """
                 const points = [];
                 let current = startBase;
                 for (let i = count; i >= 1; i--) {
-                    current = Number((current + (Math.sin(i * 0.6) * 4.5)).toFixed(2));
-                    points.push({ time: `Ngày -${i}`, value: Math.max(1100, current) });
-                }
-                points.push({ time: 'Hôm nay', value: vnIndex.price });
-                return points;
-            }, [timeframe, vnIndex]);
-
-            const filteredTickers = useMemo(() => {
-                return tickers.filter(t => {
-                    const matchesCat = activeCategory === 'ALL' || t.type === activeCategory;
-                    const matchesQuery = t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) || t.name.toLowerCase().includes(searchQuery.toLowerCase());
-                    return matchesCat && matchesQuery;
-                });
-            }, [tickers, activeCategory, searchQuery]);
-
-            const selectedTicker = useMemo(() => tickers.find(t => t.symbol === selectedTickerSymbol) || null, [tickers, selectedTickerSymbol]);
-
-            const portfolioSummary = useMemo(() => {
-                let totalCost = 0, totalMarketValue = 0;
-                tickers.forEach(t => {
-                    const h = portfolioHoldings[t.symbol];
-                    if (h && h.qty > 0) {
-                        totalCost += h.qty * h.avgPrice * 1000;
-                        totalMarketValue += h.qty * t.price * 1000;
-                    }
-                });
-                const profit = totalMarketValue - totalCost;
-                const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-                return { totalCost, totalMarketValue, profit, profitPercent };
-            }, [tickers, portfolioHoldings]);
-
-            const handleAddCustomTicker = (e) => {
-                e.preventDefault();
-                const sym = newTickerForm.symbol.trim().toUpperCase();
-                if (!sym) return;
-                const refVal = parseFloat(newTickerForm.ref) || 25.0;
-                const priceVal = parseFloat(newTickerForm.price) || refVal;
-                const newEntry = {
-                    symbol: sym, name: newTickerForm.name.trim() || sym, type: newTickerForm.type,
-                    sector: 'Cổ phiếu niêm yết', exchange: 'HOSE', ref: refVal, price: priceVal,
-                    open: refVal, high: Math.max(refVal, priceVal), low: Math.min(refVal, priceVal),
-                    volume: 1250000, foreignBuy: 1200
