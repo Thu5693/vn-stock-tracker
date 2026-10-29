@@ -1,116 +1,196 @@
 import streamlit as st
-import random
-import pandas as pd
+import streamlit.components.v1 as components
 
-# Cấu hình trang Streamlit
+# Cấu hình trang
 st.set_page_config(
-    page_title="VN-Stock Pro - Bảng Giá & Theo Dõi Chứng Khoán",
+    page_title="VN-Stock Pro Tracker",
     page_icon="📈",
     layout="wide"
 )
 
-st.title("📊 VN-Stock Pro - Theo Dõi Chứng Khoán & Quỹ ETF")
-st.markdown("Ứng dụng theo dõi trực quan chỉ số **VN-Index** và bảng giá chi tiết các mã **HPG, FUEVFVND, E1VFVN30, ACB, MBB, VIB**.")
+# Giao diện HTML/JS hoàn chỉnh cho Bảng giá chứng khoán
+html_code = """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VN-Stock Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        /* Hiệu ứng nhấp nháy khi giá thay đổi */
+        @keyframes flashGreen { 0% { background-color: rgba(34, 197, 94, 0.6); } 100% { background-color: transparent; } }
+        @keyframes flashRed { 0% { background-color: rgba(239, 68, 68, 0.6); } 100% { background-color: transparent; } }
+        .flash-green { animation: flashGreen 1s ease-out; }
+        .flash-red { animation: flashRed 1s ease-out; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div id="root"></div>
 
-# Khởi tạo dữ liệu mẫu cho các mã cổ phiếu & quỹ
-if "stocks_data" not in st.session_state:
-    st.session_state.stocks_data = [
-        {"Mã": "HPG", "Tên": "Tập đoàn Hòa Phát", "Phân loại": "Cổ phiếu", "Tham chiếu": 27.15, "Giá": 27.65, "Trần": 29.05, "Sàn": 25.25, "Khối lượng": 24850600},
-        {"Mã": "ACB", "Tên": "Ngân hàng Á Châu", "Phân loại": "Cổ phiếu", "Tham chiếu": 25.80, "Giá": 26.15, "Trần": 27.60, "Sàn": 24.00, "Khối lượng": 11640200},
-        {"Mã": "MBB", "Tên": "Ngân hàng Quân Đội", "Phân loại": "Cổ phiếu", "Tham chiếu": 25.10, "Giá": 24.85, "Trần": 26.85, "Sàn": 23.35, "Khối lượng": 16320900},
-        {"Mã": "VIB", "Tên": "Ngân hàng Quốc Tế", "Phân loại": "Cổ phiếu", "Tham chiếu": 19.25, "Giá": 19.25, "Trần": 20.60, "Sàn": 17.90, "Khối lượng": 8940100},
-        {"Mã": "E1VFVN30", "Tên": "Quỹ ETF DCVFMVN30", "Phân loại": "Quỹ ETF", "Tham chiếu": 23.15, "Giá": 23.40, "Trần": 24.75, "Sàn": 21.55, "Khối lượng": 1950800},
-        {"Mã": "FUEVFVND", "Tên": "Quỹ ETF Diamond", "Phân loại": "Quỹ ETF", "Tham chiếu": 33.20, "Giá": 33.75, "Trần": 35.50, "Sàn": 30.90, "Khối lượng": 1420500},
-    ]
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-# Khởi tạo chỉ số VN-Index
-if "vn_index" not in st.session_state:
-    st.session_state.vn_index = {
-        "val": 1268.45,
-        "ref": 1259.10,
-        "vol": "745.8 triệu CP",
-        "val_money": "18,640 tỷ đ",
-        "up": 268,
-        "ref_count": 72,
-        "down": 145
-    }
+        function App() {
+            const [vnIndex, setVnIndex] = useState({
+                val: 1268.45,
+                change: +12.30,
+                percent: +0.98,
+                status: 'up',
+                vol: '18,520 tỷ',
+                shares: { up: 285, ref: 65, down: 110 }
+            });
 
-# Nút cập nhật / làm mới dữ liệu
-col_btn1, col_btn2 = st.columns([1, 5])
-with col_btn1:
-    if st.button("🔄 Cập nhật giá"):
-        # Mô phỏng biến động ngẫu nhiên nhẹ khi bấm nút
-        st.session_state.vn_index["val"] = round(st.session_state.vn_index["val"] + random.uniform(-2, 2), 2)
-        for item in st.session_state.stocks_data:
-            delta = round(random.uniform(-0.15, 0.15), 2)
-            item["Giá"] = round(item["Giá"] + delta, 2)
+            const [stocks, setStocks] = useState([
+                { code: 'HPG', name: 'Tập đoàn Hòa Phát', type: 'Cổ phiếu', ref: 28.55, ceiling: 30.50, floor: 26.60, price: 29.10, change: +0.55, percent: +1.93, vol: '24.5M' },
+                { code: 'ACB', name: 'Ngân hàng Á Châu', type: 'Cổ phiếu', ref: 24.10, ceiling: 25.75, floor: 22.45, price: 24.50, change: +0.40, percent: +1.66, vol: '12.1M' },
+                { code: 'MBB', name: 'Ngân hàng Quân Đội', type: 'Cổ phiếu', ref: 23.40, ceiling: 25.00, floor: 21.80, price: 23.40, change: 0.00, percent: 0.00, vol: '15.8M' },
+                { code: 'VIB', name: 'Ngân hàng Quốc Tế', type: 'Cổ phiếu', ref: 19.80, ceiling: 21.15, floor: 18.45, price: 19.50, change: -0.30, percent: -1.52, vol: '8.4M' },
+                { code: 'E1VFVN30', name: 'ETF VFMVN30', type: 'Quỹ ETF', ref: 22.50, ceiling: 24.05, floor: 20.95, price: 22.80, change: +0.30, percent: +1.33, vol: '5.2M' },
+                { code: 'FUEVFVND', name: 'ETF VNDONE', type: 'Quỹ ETF', ref: 28.10, ceiling: 30.05, floor: 26.15, price: 28.45, change: +0.35, percent: +1.25, vol: '3.9M' }
+            ]);
 
-# Tính toán thay đổi VN-Index
-vn_change = round(st.session_state.vn_index["val"] - st.session_state.vn_index["ref"], 2)
-vn_percent = round((vn_change / st.session_state.vn_index["ref"]) * 100, 2)
-is_vn_up = vn_change >= 0
+            // Mô phỏng cập nhật giá ngẫu nhiên theo thời gian thực (giống bảng điện tử)
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setStocks(prevStocks => 
+                        prevStocks.map(stock => {
+                            if (Math.random() > 0.6) {
+                                const delta = (Math.random() * 0.2 - 0.1).toFixed(2);
+                                const newPrice = Number((stock.price + parseFloat(delta)).toFixed(2));
+                                const diff = Number((newPrice - stock.ref).toFixed(2));
+                                const pct = Number(((diff / stock.ref) * 100).toFixed(2));
+                                return {
+                                    ...stock,
+                                    price: newPrice,
+                                    change: diff,
+                                    percent: pct,
+                                    flash: diff > 0 ? 'up' : diff < 0 ? 'down' : 'ref'
+                                };
+                            }
+                            return { ...stock, flash: null };
+                        })
+                    );
+                }, 3000);
+                return () => clearInterval(interval);
+            }, []);
 
-# Hiển thị khối VN-Index nổi bật
-st.markdown("### 📈 Chỉ số thị trường")
-metric_col1, metric_col2, metric_col3 = st.columns(3)
+            return (
+                <div className="p-4 max-w-7xl mx-auto">
+                    <header className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                        <div>
+                            <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                                📊 VN-Stock Pro Tracker
+                            </h1>
+                            <p className="text-sm text-slate-400">Bảng giá trực tuyến & Theo dõi danh mục chứng khoán</p>
+                        </div>
+                        <div className="text-right">
+                            <span className="inline-block px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full text-xs font-semibold animate-pulse">
+                                ● Thị trường đang mở cửa
+                            </span>
+                        </div>
+                    </header>
 
-with metric_col1:
-    st.metric(
-        label="VN-INDEX (HOSE)",
-        value=f"{st.session_state.vn_index['val']:.2f} điểm",
-        delta=f"{vn_change:+.2f} ({vn_percent:+.2f}%)"
-    )
+                    {/* Khối hiển thị VN-Index */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+                            <span className="text-slate-400 text-sm font-medium">Chỉ số VN-INDEX</span>
+                            <div className="flex items-baseline space-x-3 mt-1">
+                                <span className="text-3xl font-extrabold text-emerald-400">{vnIndex.val}</span>
+                                <span className="text-emerald-400 font-bold text-sm">+{vnIndex.change} (+{vnIndex.percent}%)</span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-2">Khối lượng: {vnIndex.vol}</div>
+                        </div>
 
-with metric_col2:
-    st.metric(
-        label="Khối lượng & Giá trị GD",
-        value=st.session_state.vn_index["vol"],
-        delta=st.session_state.vn_index["val_money"]
-    )
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col justify-between">
+                            <span className="text-slate-400 text-sm font-medium">Độ rộng thị trường</span>
+                            <div className="flex justify-between text-center my-auto">
+                                <div>
+                                    <div className="text-emerald-400 font-bold text-lg">{vnIndex.shares.up}</div>
+                                    <div className="text-xs text-slate-500">Tăng</div>
+                                </div>
+                                <div>
+                                    <div className="text-amber-400 font-bold text-lg">{vnIndex.shares.ref}</div>
+                                    <div className="text-xs text-slate-500">Tham chiếu</div>
+                                </div>
+                                <div>
+                                    <div className="text-rose-500 font-bold text-lg">{vnIndex.shares.down}</div>
+                                    <div className="text-xs text-slate-500">Giảm</div>
+                                </div>
+                            </div>
+                        </div>
 
-with metric_col3:
-    st.metric(
-        label="Độ rộng thị trường",
-        value=f"Tăng: {st.session_state.vn_index['up']} | Giảm: {st.session_state.vn_index['decliners']}",
-        delta=f"Đứng giá: {st.session_state.vn_index['ref_count']}"
-    )
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 md:col-span-2 flex items-center justify-between shadow-lg">
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-300">💡 Gợi ý đầu tư nhanh</h3>
+                                <p className="text-xs text-slate-400 mt-1">Theo dõi sát sao nhóm ngân hàng (ACB, MBB, VIB) và Thép (HPG) trong các nhịprung lắc của thị trường.</p>
+                            </div>
+                            <button onClick={() => alert("Dữ liệu được cập nhật liên tục từ hệ thống mô phỏng chuẩn HOSE.")} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition">
+                                Làm mới dữ liệu
+                            </button>
+                        </div>
+                    </div>
 
-st.markdown("---")
-st.markdown("### 📋 Bảng giá chi tiết danh mục trọng tâm")
+                    {/* Bảng giá chi tiết */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+                            <h2 className="font-semibold text-lg text-slate-200">Danh mục theo dõi (Cổ phiếu & Quỹ ETF)</h2>
+                            <span className="text-xs text-slate-400">* Đơn vị giá: 1,000 VNĐ</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-950 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                                        <th className="p-3 font-semibold">Mã</th>
+                                        <th className="p-3 font-semibold">Tên tài sản</th>
+                                        <th className="p-3 font-semibold text-right">Trần</th>
+                                        <th className="p-3 font-semibold text-right">Sàn</th>
+                                        <th className="p-3 font-semibold text-right">Tham chiếu</th>
+                                        <th className="p-3 font-semibold text-right">Giá Khớp</th>
+                                        <th className="p-3 font-semibold text-right">Tăng/Giảm (+/-)</th>
+                                        <th className="p-3 font-semibold text-right">Khối lượng</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/60 text-sm">
+                                    {stocks.map((item) => {
+                                        const colorClass = item.change > 0 ? 'text-emerald-400 font-bold' : item.change < 0 ? 'text-rose-500 font-bold' : 'text-amber-400 font-bold';
+                                        return (
+                                            <tr key={item.code} className="hover:bg-slate-800/40 transition">
+                                                <td className="p-3 font-bold text-white flex items-center space-x-2">
+                                                    <span>{item.code}</span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-normal">{item.type}</span>
+                                                </td>
+                                                <td className="p-3 text-slate-300 text-xs">{item.name}</td>
+                                                <td className="p-3 text-right text-purple-400 font-medium">{item.ceiling.toFixed(2)}</td>
+                                                <td className="p-3 text-right text-cyan-400 font-medium">{item.floor.toFixed(2)}</td>
+                                                <td className="p-3 text-right text-amber-400 font-medium">{item.ref.toFixed(2)}</td>
+                                                <td className={`p-3 text-right ${colorClass}`}>{item.price.toFixed(2)}</td>
+                                                <td className={`p-3 text-right ${colorClass}`}>
+                                                    {item.change > 0 ? `+${item.change}` : item.change} ({item.percent > 0 ? `+${item.percent}%` : `${item.percent}%`})
+                                                </td>
+                                                <td className="p-3 text-right text-slate-400 text-xs">{item.vol}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
 
-# Xử lý dữ liệu hiển thị bảng
-table_rows = []
-for item in st.session_state.stocks_data:
-    change = round(item["Giá"] - item["Tham chiếu"], 2)
-    percent = round((change / item["Tham chiếu"]) * 100, 2)
-    
-    # Xác định trạng thái màu sắc theo chuẩn chứng khoán VN
-    if item["Giá"] >= item["Trần"]:
-        status = "🟣 Kịch trần"
-    elif item["Giá"] <= item["Sàn"]:
-        status = "🔵 Lau sàn"
-    elif item["Giá"] > item["Tham chiếu"]:
-        status = "🟢 Tăng"
-    elif item["Giá"] < item["Tham chiếu"]:
-        status = "🔴 Giảm"
-    else:
-        status = "🟡 Tham chiếu"
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+"""
 
-    table_rows.append({
-        "Mã CK": item["Mã"],
-        "Tên tài sản": item["Tên"],
-        "Phân loại": item["Phân loại"],
-        "Trần": item["Trần"],
-        "Sàn": item["Sàn"],
-        "Tham chiếu": item["Tham chiếu"],
-        "Giá Khớp (k.đ)": item["Giá"],
-        "Giá VNĐ": f"{int(item['Giá'] * 1000):,} đ",
-        "Biến động": f"{change:+.2f} ({percent:+.2f}%)",
-        "Trạng thái": status,
-        "Khối lượng": f"{item['Khối lượng']:,}"
-    })
-
-df = pd.DataFrame(table_rows)
-st.dataframe(df, use_container_width=True, hide_index=True)
-
-st.info("💡 Mẹo: Bạn có thể nhấn nút **Cập nhật giá** ở phía trên để giả lập dòng tiền khớp lệnh mua bán trực tiếp của thị trường.")
+# Hiển thị trực tiếp nội dung HTML/JS chuẩn đẹp trong ứng dụng Streamlit
+components.html(html_code, height=750, scrolling=True)
